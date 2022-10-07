@@ -1,0 +1,29 @@
+use('loja')
+
+
+//essa abordagem é utilizada quando precisamos armazenar valores em uma variavel
+/*var produto = db.produtos.findOneAndUpdate({ 
+    "modelo": "iPhone 13", 
+    "quantidade": {
+        $gt: 0
+    }   
+},
+{
+    $inc: {
+        "quantidade": -1
+    }
+}, 
+{
+    projection: {
+        "marca": 1,
+        "modelo": 1,
+        "preco": 1, 
+    }
+})*/
+
+/*db.clientes.updateOne({
+    "nome": "Haliane Pessoa"
+},
+{
+    $push: {"carrinho.produtos": produto}
+})*/
