@@ -2,8 +2,9 @@ use('loja')
 
 
 //essa abordagem é utilizada quando precisamos armazenar valores em uma variavel
-/*var produto = db.produtos.findOneAndUpdate({ 
-    "modelo": "iPhone 13", 
+//adicionando produto ao carrinho
+var produto = db.produtos.findOneAndUpdate({ 
+    "modelo": "iPhone 8", 
     "quantidade": {
         $gt: 0
     }   
@@ -19,11 +20,125 @@ use('loja')
         "modelo": 1,
         "preco": 1, 
     }
-})*/
+})
 
-/*db.clientes.updateOne({
+//atualizando carrinho com os novos produtos armazenados na variavel
+db.clientes.updateOne({
     "nome": "Haliane Pessoa"
 },
 {
     $push: {"carrinho.produtos": produto}
-})*/
+})
+
+/* é uma etapa da agregacao parecida com a projection, repassamos para ela os campos que queremos que */
+/*ele exiba é aqui que feita modelagem do banco*/
+// $merge combina os dados de uma collection existentes com os dados de uma nova collection
+
+//criando nova collection com aggregation dos 
+db.clientes.aggregate([
+    {
+        $match: {
+            nome: "Haliane Pessoa"
+        },
+    },
+    {
+        $project: {
+            _id: 0,
+            id_cliente: "$_id",
+            endereco: "$endereco",
+            data: ISODate(), //para iniciar com a data atual
+            produtos: "$carrinho.produtos", 
+            valores: {
+                $sum: "$carrinho.produtos.preco"
+            }
+        }
+    },
+    {
+        $merge: "pedidos"
+    }
+])
+
+//zerando carrinho
+db.clientes.updateOne({
+    nome: "Haliane Pessoa"
+}, {
+    $set: {
+        "carrinho.produtos": []
+    }
+
+})
+
+
+//relacao muitos para muitos
+
+//criando loja
+db.lojas.insertOne({
+    nome: "Magazine Luiza",
+    endereco: "Av. Cruzeiro do Sul, 1100",
+})
+
+//incluindo loja nos produtos
+var magazineLuiza = db.lojas.findOne({ nome: "Magazine Luiza" })
+
+var fastShop = db.lojas.findOne({ nome: "Fast shop" })
+
+db.produtos.updateOne(
+    { modelo: "Moto G7" },
+    { $set: { vendido_em: [magazineLuiza._id, fastShop._id] }}
+)
+
+//incluindo produtos nas lojas
+var iPhone13 = db.produtos.findOne({ modelo: "iPhone 13" })
+
+var iPhone8 = db.produtos.findOne({ modelo: "iPhone 8" })
+
+db.lojas.updateOne(
+    { nome: "Apple Store" },
+    { $set: { produtos: [iPhone13._id, iPhone8._id] }}
+)
+
+//buscando dados de muito para muitos com aggregate
+//procurar os produtos que sao vendidos em determinada loja
+db.lojas.aggregate([{
+    $match: {
+      nome: "Apple Store"
+    }
+},  {
+    $lookup: {
+        from: "produtos",
+        localField: "produtos",
+        foreignField: "_id",
+        as: "lista_produtos"
+    },
+}])
+
+//para casar as lojas com os produtos
+db.produtos.aggregate([{
+    $match: {
+      modelo: "Moto G7"
+    }
+},{
+    $lookup: {
+      from: "lojas",
+      localField: "vendido_em",
+      foreignField: "_id",
+      as: "lista_lojas"
+    }
+}])
+
+//retirando os produtos das lojas evitando relacao muitos para muitos desbalanceada
+//precisamos remover o campo de produtos das lojas 
+db.lojas.updateMany({}, {
+    $unset: {
+        produtos: 1
+    }
+})
+
+//realizando pesquisa para verificar a relacao essa abordagem evita que eu tenha que varrer todos os arrays onde existam produtos que eu precise incluir ou deletar
+//nessa abordagem basta somente adicionar um produto no documento de produtos e ele manterá a relacao
+/*Nós removemos o array chamado “produtos” dos documentos da coleção “lojas”, assim continuamos com o nosso relacionamento muitos-para-muitos, mas não temos o problema de performance na hora de inserir ou remover produtos. Mesmo representando de uma forma diferente, continuamos tendo uma relação de muitos-para-muitos.*/
+var appleStore = db.lojas.findOne({ nome: "Apple Store" })
+
+db.produtos.find({
+    vendido_em: "appleStore._id"
+})
